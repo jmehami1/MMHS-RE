@@ -1,0 +1,377 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Sample Code</title><meta name="generator" content="MATLAB 7.12"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2014-04-21"><meta name="DC.source" content="example_code.m"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>Sample Code</h1><p>Here, we illustrate how to process hyperspectral imagery with S
+  cyllarus and some of the options available on our Matlab toolbox. To do this, we commence by reading an HSZ (hyperspectral zipped) 
+  file from disk, convert it into a flat (FLA) image and show it in pseudoculour using imtool</p>
+  
+  <pre class="codeinput">   I = FLAread(<span class="string">'.\shared\samples\apples_small.fla'</span>);
+   Irgb = recover_RGBImage(I);
+   imtool(Irgb);
+</pre>
+<!-- <pre class="codeoutput">Colour matching function not provided. Using spectral response for the Nikon D70 instead.
+Iteration 1 ...
+</pre> -->
+<img vspace="5" hspace="5" src="example_code_01.png" alt=""> 
+
+<p>With the image in hand, we proceed to read SLZ files (spectra library file) containing canonical illuminants and endmember spectra 
+and process the FLA using Scyllarus with material indexation and spectra represented as Gaussian mixtures and NURBS. Here, we have used 
+the capacity of Scyllarus to limit the materials in the scene to 4. Once the HSZ is computed, the material map can be visualised using 
+imtool as follows.</p>
+<pre class="codeinput">  CanonicalIlluminants = SLZread(<span class="string">'ISSAlluminants9.slz'</span>);
+  Endmembers = SLZread(<span class="string">'ISSA72.slz'</span>);
+  options=struct(<span class="string">'MaterialIndexed'</span>,1,<span class="string">'IlluminantIndexed'</span>,1,<span class="string">'maxnumMaterials'</span>, 4,<span class="keyword">...</span>
+    <span class="string">'numMaterials'</span>,3, <span class="string">'MaterialEncoding'</span>, <span class="string">'GMM'</span>, <span class="string">'SpecularityEncoding'</span>, <span class="string">'GMM'</span>,<span class="keyword">...</span>
+    <span class="string">'IlluminantEncoding'</span>, <span class="string">'NURBS'</span>);
+  HSZ=Scyllarus(I, options, Endmembers, CanonicalIlluminants);
+  imtool(HSZ.S.ElementAbundanceIndexes(:,:,1)/max(max(max(HSZ.S.ElementAbundanceIndexes))));
+</pre>
+
+<img vspace="5" hspace="5" src="example_code_02.png" alt=""> 
+
+<!-- <pre class="codeoutput">Using the method of Huynh and Robles-kelly for recoverying the illuminant power spectrum.
+image information:
+height = 260, width = 348, bands = 30
+Input image is smoothed by Wiener filter
+start to choose smooth patches.
+172 smooth patches are detected
+patches are chosen.
+50 patches are selected
+solving iteration begins:
+Iteration: 1
+Iteration: 2
+Iteration: 3
+Iteration: 4
+Iteration: 5
+Iteration: 6
+Iteration: 7
+Iteration: 8
+Iteration: 9
+solving iteration ends
+Finished with the pixelwise illuminant indexing
+Performing the photometric parameter recovery ...
+Using the least-squares method for the specularity recovery.
+Start to compute specularities.
+done
+Performing the indexation to 3 materials.
+Performing the specularity indexation ...
+Iteration 1 ...
+Performing the unmixing to 4 end members.
+Iteration 1 ...
+Performing the unmixing to 4 end members.
+Iteration 1 ...
+Iteration 1 ...
+</pre> -->
+
+
+<p>We now write the HSZ file to disk using a medium level of compression and 8-bit unsigned integers. We also display 
+the specular highlights and shading using imtool.</p>
+<pre class="codeinput">  save_options.compression = 5;
+  save_options.datatype = <span class="string">'uint8'</span>;
+  HSZwrite(<span class="string">'.\shared\samples\apples_samples.hsz'</span>, HSZ, save_options);
+  imtool(HSZ.K.Factor/max(max(HSZ.K.Factor)));
+  imtool(HSZ.S.Factor/max(max(HSZ.S.Factor)));
+</pre>
+<img vspace="5" hspace="5" src="example_code_03.png" alt="" width="350"> 
+<img vspace="5" hspace="5" src="example_code_04.png" alt="" width="350"> 
+
+<p>And recover the global illuminant using both, the shade of grey and the method of Huynh and Robles-Kelly. 
+We then plot both with respect to wavelenght using different markers and a second degree spline curve (NURBS) resampled at 1nm intervals</p>
+<pre class="codeinput">  options.method = <span class="string">'SG'</span>;
+  L1 = recover_global_illuminant(I.I, options);
+  L2 = recover_global_illuminant(I.I);
+  bands = length(I.HDR.wavelength);
+  [KNOTS, CP_REF, CP_WAVE] = get_nurbs(reshape(L1,1,1,bands),reshape(I.HDR.wavelength,1,1,bands), 2);
+  [L_new1, wavelength_new1] = eval_nurbs(KNOTS,<span class="keyword">...</span>
+    [min(I.HDR.wavelength(1)):1:max(I.HDR.wavelength)], CP_REF, CP_WAVE, 2);
+  [KNOTS, CP_REF, CP_WAVE] = get_nurbs(reshape(L2,1,1,bands),reshape(I.HDR.wavelength,1,1,bands), 2);
+  [L_new2, wavelength_new2] = eval_nurbs(KNOTS,<span class="keyword">...</span>
+    [min(I.HDR.wavelength(1)):1:max(I.HDR.wavelength)], CP_REF, CP_WAVE, 2);
+  bands_new = length(wavelength_new1);
+  plot(I.HDR.wavelength, L1,<span class="string">'*r'</span>,I.HDR.wavelength, L2,<span class="string">'+b'</span>);
+  legend({<span class="string">'Illuminant yielded by the shade of Grey method'</span>;<span class="keyword">...</span>
+      <span class="string">'Illuminant recovered by the method of Huynh and Robles-kelly'</span>},<span class="string">'Location'</span>,<span class="string">'North'</span>);
+  hold <span class="string">on</span>;
+  plot(wavelength_new1,reshape(L_new1,1,bands_new),<span class="string">'r'</span>,wavelength_new2,reshape(L_new2,1,bands_new),<span class="string">'b'</span>);
+</pre>
+
+<img vspace="5" hspace="5" src="example_code_05.png" alt="">
+
+<!-- <pre class="codeoutput">Performing the illuminant power spectrum recovery using the Shade of Grey method...
+done
+Using the method of Huynh and Robles-kelly for recoverying the illuminant power spectrum.
+Iteration 1 ...
+Iteration 1 ...
+</pre> --> <p>Now we open another multispectral image in HSZ format and crop it. We reprocess the HSZ file using Scyllarus 
+with RAW encoding and multiple illuminants in the scene. Here, the illuminant is computed using the shade of grey method ('SG'). 
+The HSZ can be displayed in pseudocolour using recover_RGBimage and imtool. Below, the input image is displayed on the left-hand panel 
+while image without the lluminant contribution is shown on the right-hand panel.</p>
+<pre class="codeinput">  HSZ = HSZread(<span class="string">'.\shared\samples\scene1_on_red_pink.hsz'</span>,[33 34 644 444]);
+  options=struct(<span class="string">'MaterialIndexed'</span>,1,<span class="string">'SpecularityIndexed'</span>,0,<span class="string">'MaterialEncoding'</span>,<span class="keyword">...</span>
+    <span class="string">'RAW'</span>, <span class="string">'SpecularityEncoding'</span>, <span class="string">'RAW'</span>, <span class="string">'IlluminantEncoding'</span>, <span class="string">'RAW'</span>,<span class="string">'maxnumIlluminants'</span>, 7, <span class="keyword">...</span>
+    <span class="string">'numIlluminants'</span>,7,<span class="string">'maxnumMaterials'</span>, 10, <span class="string">'numMaterials'</span>,5);
+  options.L.method = <span class="string">'SG'</span>;
+  HSZ=Scyllarus(HSZ,options);
+  Irgb = recover_RGBImage(HSZ);
+  imtool(Irgb);
+  Multi_L = HSZ.L.Elements;
+  HSZ.L.Elements = ones(size(HSZ.L.Elements));
+  Irgb = recover_RGBImage(HSZ);
+  imtool(Irgb);
+</pre>
+
+<img vspace="5" hspace="5" src="example_code_06.png" alt="" width="350"> 
+<img vspace="5" hspace="5" src="example_code_07.png" alt="" width="350"> 
+<!-- <pre class="codeoutput">Performing the illuminant power spectrum recovery using the Shade of Grey method...
+done
+Performing the illuminant power spectrum recovery using the Shade of Grey method...
+done
+Performing the illuminant power spectrum recovery using the Shade of Grey method...
+done
+Finished with the pixelwise illuminant indexing
+Performing the photometric parameter recovery ...
+Using the least-squares method for the specularity recovery.
+Start to compute specularities.
+done
+Performing the indexation to 5 materials.
+Colour matching function not provided. Using spectral response for the Nikon D70 instead.
+Iteration 1 ...
+Colour matching function not provided. Using spectral response for the Nikon D70 instead.
+Iteration 1 ...
+</pre> -->
+
+
+<p>We can also view the illuminant and reflectance colour maps</p>
+<pre class="codeinput">  HSZ.L.Elements = Multi_L;
+  Materials = HSZ.S.Elements;
+  HSZ.S.Elements = ones(size(HSZ.S.Elements));
+  HSZ.S.Factor = ones(size(HSZ.S.Factor));
+  HSZ.K.Factor = ones(size(HSZ.K.Factor));
+  Irgb = recover_RGBImage(HSZ);
+  imtool(Irgb);
+  HSZ.S.Elements = Materials;
+  HSZ.L.Elements = ones(size(HSZ.L.Elements));
+  Irgb = recover_RGBImage(HSZ);
+  imtool(Irgb);
+</pre>
+
+<img vspace="5" hspace="5" src="example_code_08.png" alt="" width="350"> 
+<img vspace="5" hspace="5" src="example_code_09.png" alt="" width="350">
+
+<!-- <pre class="codeoutput">Colour matching function not provided. Using spectral response for the Nikon D70 instead.
+Iteration 1 ...
+Colour matching function not provided. Using spectral response for the Nikon D70 instead.
+Iteration 1 ...
+</pre> -->
+ 
+ <p>Or plot the third, fifth and tenth materials as follows</p>
+ <pre class="codeinput">  plot(HSZ.HDR.wavelength, Materials(3,:), <span class="string">'+r'</span>, HSZ.HDR.wavelength, <span class="keyword">...</span>
+      Materials(5,:), <span class="string">'*g'</span>, HSZ.HDR.wavelength, Materials(10,:), <span class="string">'*b'</span>);
+  legend({<span class="string">'Third Material'</span>;<span class="string">'Fifth Material'</span>;<span class="string">'Tenth Material'</span>},<span class="string">'Location'</span>,<span class="string">'North'</span>);
+  new_wavelength = min(HSZ.HDR.wavelength):2.5:max(HSZ.HDR.wavelength);
+  [Materials_new1, wavelength_new1] = translate_spectra(Materials(3,:), <span class="keyword">...</span>
+      HSZ.HDR.wavelength', new_wavelength);
+  [Materials_new2, wavelength_new2] = translate_spectra(Materials(5,:), <span class="keyword">...</span>
+      HSZ.HDR.wavelength', new_wavelength);
+  [Materials_new3, wavelength_new3] = translate_spectra(Materials(10,:), <span class="keyword">...</span>
+      HSZ.HDR.wavelength', new_wavelength);
+  hold <span class="string">on</span>;
+  bands_new1 = length(wavelength_new1);
+  bands_new2 = length(wavelength_new2);
+  bands_new3 = length(wavelength_new3);
+  plot(wavelength_new1,reshape(Materials_new1,1,bands_new1),<span class="string">'r'</span>,wavelength_new2,<span class="keyword">...</span>
+      reshape(Materials_new2,1,bands_new2),<span class="string">'g'</span>,wavelength_new3, <span class="keyword">...</span>
+      reshape(Materials_new3,1,bands_new3),<span class="string">'b'</span>);
+</pre>
+
+<img vspace="5" hspace="5" src="example_code_10.png" alt="">
+
+<!-- <pre class="codeoutput">Iteration 1 ...
+Iteration 1 ...
+Iteration 1 ...
+</pre>  -->
+<p class="footer"><br>
+      Published with MATLAB&reg; 7.12<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Sample Code
+%
+% Read an HSZ file from disk, convert it into a flat (FLA) image cube and show it in 
+% pseudoculour using imtool
+
+   I = FLAread('.\shared\samples\apples_small.fla');
+   Irgb = recover_RGBImage(I);
+   imtool(Irgb); 
+
+%% 
+% With the image in hand, we proceed to read SLZ files (spectra library file) 
+% containing canonical illuminants and endmember spectra and process the 
+% FLA using Scyllarus with material indexation and spectra represented 
+% as Gaussian mixtures and NURBS. Scyllarus allows for limiting the materials in the 
+% scene to 4. The dominant material and specularity maps can then be easily visualised 
+% using imtool. Once the HSZ is computed, the material map can be visualised using imtool.
+
+  CanonicalIlluminants = SLZread('ISSAlluminants9.slz');
+  Endmembers = SLZread('ISSA72.slz');
+  options=struct('MaterialIndexed',1,'IlluminantIndexed',1,'maxnumMaterials', 4,...
+    'numMaterials',3, 'MaterialEncoding', 'GMM', 'SpecularityEncoding', 'GMM',...
+    'IlluminantEncoding', 'NURBS');
+  HSZ=Scyllarus(I, options, Endmembers, CanonicalIlluminants);
+  imtool(HSZ.S.ElementAbundanceIndexes(:,:,1)/max(max(max(HSZ.S.ElementAbundanceIndexes))));
+  
+
+%% 
+% We now write the HSZ file to disk using a medium level of compression and unsigned 
+% integers as data type. We also display the specular highlights and shading.
+
+  save_options.compression = 5;
+  save_options.datatype = 'uint8';
+  HSZwrite('.\shared\samples\apples_samples.hsz', HSZ, save_options);
+  imtool(HSZ.K.Factor/max(max(HSZ.K.Factor)));
+  imtool(HSZ.S.Factor/max(max(HSZ.S.Factor)));
+  
+%% 
+% And recover the global illuminant using both, the shade of grey and the method 
+% of Huynh and Robles-Kelly. We then plot both with respect to wavelenght
+% using different markers and a second degree spline curve (NURBS)
+
+  options.method = 'SG';
+  L1 = recover_global_illuminant(I.I, options);
+  L2 = recover_global_illuminant(I.I);
+  bands = length(I.HDR.wavelength);
+  [KNOTS, CP_REF, CP_WAVE] = get_nurbs(reshape(L1,1,1,bands),reshape(I.HDR.wavelength,1,1,bands), 2);
+  [L_new1, wavelength_new1] = eval_nurbs(KNOTS,...
+    [min(I.HDR.wavelength(1)):1:max(I.HDR.wavelength)], CP_REF, CP_WAVE, 2);
+  [KNOTS, CP_REF, CP_WAVE] = get_nurbs(reshape(L2,1,1,bands),reshape(I.HDR.wavelength,1,1,bands), 2);
+  [L_new2, wavelength_new2] = eval_nurbs(KNOTS,...
+    [min(I.HDR.wavelength(1)):1:max(I.HDR.wavelength)], CP_REF, CP_WAVE, 2);
+  bands_new = length(wavelength_new1);
+  plot(I.HDR.wavelength, L1,'*r',I.HDR.wavelength, L2,'+b');
+  legend({'Illuminant yielded by the shade of Grey method';...
+      'Illuminant recovered by the method of Huynh and Robles-kelly'},'Location','North');
+  hold on;
+  plot(wavelength_new1,reshape(L_new1,1,bands_new),'r',wavelength_new2,reshape(L_new2,1,bands_new),'b');
+  
+
+%% 
+% Now we open another multispectral image in HSZ format and crop it. We reprocess  
+% the HSZ file using Scyllarus with RAW encoding and multiple illuminants in the 
+% scene. Here, the illuminant is computed using the shade of grey method ('SG').
+% The HSZ can be displayed in pseudocolour using recover_RGBimage and imtool. 
+% The input image is displayed on the left-hand panel while image without the 
+% lluminant contribution is shown on the right-hand panel.
+ 
+
+  HSZ = HSZread('.\shared\samples\scene1_on_red_pink.hsz',[33 34 644 444]);
+  options=struct('MaterialIndexed',1,'SpecularityIndexed',0,'MaterialEncoding',...
+    'RAW', 'SpecularityEncoding', 'RAW', 'IlluminantEncoding', 'RAW','maxnumIlluminants', 7, ...
+    'numIlluminants',7,'maxnumMaterials', 10, 'numMaterials',5);
+  options.L.method = 'SG';
+  HSZ=Scyllarus(HSZ,options);
+  Irgb = recover_RGBImage(HSZ);
+  imtool(Irgb); 
+  Multi_L = HSZ.L.Elements;
+  HSZ.L.Elements = ones(size(HSZ.L.Elements));
+  Irgb = recover_RGBImage(HSZ);
+  imtool(Irgb);
+
+%%
+% We can also view the illuminant and reflectance colour maps
+
+  HSZ.L.Elements = Multi_L;
+  Materials = HSZ.S.Elements;
+  HSZ.S.Elements = ones(size(HSZ.S.Elements));
+  HSZ.S.Factor = ones(size(HSZ.S.Factor));
+  HSZ.K.Factor = ones(size(HSZ.K.Factor));
+  Irgb = recover_RGBImage(HSZ);
+  imtool(Irgb);
+  HSZ.S.Elements = Materials;
+  HSZ.L.Elements = ones(size(HSZ.L.Elements));
+  Irgb = recover_RGBImage(HSZ);
+  imtool(Irgb);
+  
+%%
+% Or plot the third, fifth and tenth materials
+ 
+  plot(HSZ.HDR.wavelength, Materials(3,:), '+r', HSZ.HDR.wavelength, ...
+      Materials(5,:), '*g', HSZ.HDR.wavelength, Materials(10,:), '*b');
+  legend({'Third Material';'Fifth Material';'Tenth Material'},'Location','North');
+  new_wavelength = min(HSZ.HDR.wavelength):2.5:max(HSZ.HDR.wavelength);
+  [Materials_new1, wavelength_new1] = translate_spectra(Materials(3,:), ...
+      HSZ.HDR.wavelength', new_wavelength);
+  [Materials_new2, wavelength_new2] = translate_spectra(Materials(5,:), ...
+      HSZ.HDR.wavelength', new_wavelength);
+  [Materials_new3, wavelength_new3] = translate_spectra(Materials(10,:), ...
+      HSZ.HDR.wavelength', new_wavelength);
+  hold on;
+  bands_new1 = length(wavelength_new1);
+  bands_new2 = length(wavelength_new2);
+  bands_new3 = length(wavelength_new3);
+  plot(wavelength_new1,reshape(Materials_new1,1,bands_new1),'r',wavelength_new2,...
+      reshape(Materials_new2,1,bands_new2),'g',wavelength_new3, ...
+      reshape(Materials_new3,1,bands_new3),'b');
+
+
+
+##### SOURCE END #####
+--></body></html>

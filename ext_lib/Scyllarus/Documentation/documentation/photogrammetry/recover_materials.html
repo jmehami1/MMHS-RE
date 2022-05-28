@@ -1,0 +1,228 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Recover the set of materials in the scene</title><meta name="generator" content="MATLAB 7.12"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2014-04-07"><meta name="DC.source" content="recover_materials.m"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>Recover the set of materials in the scene</h1><!--introduction--><!--/introduction-->
+  <h2>Contents</h2><div><ul><li><a href="#1">Syntax</a></li><li><a href="#2">Description</a></li><li><a href="#3">Input</a></li><li><a href="#4">Output</a></li></ul></div>
+  <h2>Syntax:<a name="1"></a></h2><pre>     [MAT, MATIND, MATAB] = recover_materials(S);
+     [MAT, MATIND, MATAB] = recover_materials(S, [], DEBUG);
+     [MAT, MATIND, MATAB] = recover_materials(S, [],[], DOWNSAMPLERATE);
+     [MAT, MATIND, MATAB] = recover_materials(S, [],[],[], MAX_CLU_NUM)
+     [MAT, MATIND, MATAB] = recover_materials(S, [],[],[], [], TMAX):
+     [MAT, MATIND, MATAB] = recover_materials(S, [],[],[], [], [], TMIN):
+     [MAT, MATIND, MATAB] = recover_materials(S, [],[],[], [], [], [],COOLRATE):
+     [MAT, MATIND, MATAB] = recover_materials(S, [],[],[], [], [], [], [], SPLIT_THRESHOLD);
+     [MAT, MATIND, MATAB] = recover_materials(S, METHOD, DEBUG,...
+             DOWNSAMPLERATE, MAX_CLU_NUM, TMAX, TMIN, COOLRATE, SPLIT_THRESHOLD);</pre>
+			 
+			 <h2>Description:<a name="2"></a></h2><pre>     This function computes the spectrum of the materials in the scene.</pre>
+			 <h2>Input:<a name="3"></a></h2><pre>     S : Image reflectance spectra organised as a 2D matrix of 
+          dimensions height*width x bands.
+     METHOD: String denoting the method to be used, i.e. 'DA' or
+          'KM' for either deterministic annealing or k-means,
+          respectively. The default is determinsitic annealing ('DA').
+      DEBUG: The level of debugging information to be shown at execution time. It
+          ranges from 1 to 5, 1 (default) displays minimal information.
+      TMAX: The maximum temperature of the deterministic annealing process. (default: 0.02)
+      TMIN: The minimum temperature of the deterministic annealing process (default 0.00025)
+      COOLRATE: The cooling rate at each iteration of the DA algorithm. (default: 0.8)
+      MAX_CLU_NUM: The maximum number of clusters (default: 20).
+      SPLIT_THRESHOLD: The threshold below which a cluster should be split. When the dot
+          product between the real and the surrogate centroid vectors fall below this
+          threshold, then the cluster is split (default: cos(5*pi/180)).
+      DOWNSAMPLERATE:  The rate at which the input image is down sampled. 
+          The default is 1 (no downsampling).</pre>
+		  
+		  <h2>Output:<a name="4"></a></h2><pre>
+     MAT: Spectra for the materials  in the image. This is a 2D array of size 
+          materials x bands.
+     MATAB: The material abundancy matrix for each pixel in a matrix of size 
+          height x width x materials.
+     MATIND: The material indexes for each pixel on a matrix of size 
+          height x width x materials. </pre>
+		  <p class="footer"><br>Published with MATLAB&reg; 7.12<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Recover the set of materials in the scene
+%
+%% Syntax
+%   [MAT, MATIND, MATAB] = recover_materials(S);
+%   [MAT, MATIND, MATAB] = recover_materials(S, [], DEBUG); 
+%   [MAT, MATIND, MATAB] = recover_materials(S, [],[], DOWNSAMPLERATE);
+%   [MAT, MATIND, MATAB] = recover_materials(S, [],[],[], MAX_CLU_NUM) 
+%   [MAT, MATIND, MATAB] = recover_materials(S, [],[],[], [], TMAX):
+%   [MAT, MATIND, MATAB] = recover_materials(S, [],[],[], [], [], TMIN):
+%   [MAT, MATIND, MATAB] = recover_materials(S, [],[],[], [], [], [],COOLRATE):
+%   [MAT, MATIND, MATAB] = recover_materials(S, [],[],[], [], [], [], [], SPLIT_THRESHOLD); 
+%   [MAT, MATIND, MATAB] = recover_materials(S, METHOD, DEBUG,...
+%               DOWNSAMPLERATE, MAX_CLU_NUM, TMAX, TMIN, COOLRATE, SPLIT_THRESHOLD);
+%
+%% Description
+%
+%   Clustering a given set of feature vectors using either
+%   the deterministic annealing approach introduced by Kenneth Rose (Deterministic 
+%   Annealing for Clustering, Compression, Classification, Regression and Related
+%   Optimization Problems, Proceeding IEEE, 1998) or K-means.
+%   The distance metric used in this implementation is the spectral angle
+%   (or the dot product) between any two normalised reflectance spectra.
+
+%    
+%% Input:
+%   S :              2D matrix of source image reflectance in vector format
+%                    (height*width, bands)
+%   METHOD:          String denoting the method to be used, i.e. 'DA' or
+%                    'KM' for either deterministic annealing or k-means,
+%                    respectively. The default is determinsitic annealing ('DA').
+%   DEBUG:           The level of debugging information to be shown. It
+%                    ranges from 1 to 5, 1 (default) for the minimal information
+%                    while 5 means the most detailed description. 
+%   TMAX:            The maximum temperature of the deterministic annealing process. (default: 0.02)
+%   TMIN:            The minimum temperature of the deterministic annealing process (default 0.00025)
+%   COOLRATE:        The cooling factor in each iteration of the outer loop. (default: 0.8)
+%   MAX_CLU_NUM:     The maximum number of clusters. (default: 20)
+%   SPLIT_THRESHOLD: The (dot product) threshold below which a cluster should be split. When the dot
+%                    product between the real and the surrogate centroid vectors fall below this
+%                    threshold, then the cluster needs to be split. (default: cos(5*pi/180))
+%   DOWNSAMPLERATE:  the rate that the input image is down sampled at. Default is 1 (no downsampling)
+%                    (default: 1)
+%   
+%
+%% Output:
+%   MAT:    materials found by this function. (materials x bands) 
+%   MATAB:  The material abundancy matrix for each pixel (height x width x materials number) 
+%   MATIND: The material index image for each pixel (height x width)
+%   
+
+function [MAT, MATIND, MATAB] = recover_materials(S, METHOD, DEBUG, DOWNSAMPLERATE, MAX_CLU_NUM, TMAX, TMIN, COOLRATE, SPLIT_THRESHOLD) 
+    
+% This computer code is subject to copyright: (c) National ICT Australia Limited (NICTA) 2013 All Rights Reserved.
+% Author: Ran Wei
+% Version: 1.0.5
+% Last Update Date: 29 Oct 2013
+
+[~,~,bands] = size(S);
+    
+    %   handle and verify input parameters.
+    if ~exist('SPLIT_THRESHOLD', 'var') || numel(SPLIT_THRESHOLD) ~= 1 || SPLIT_THRESHOLD(1) < 0 ...
+       || isempty(SPLIT_THRESHOLD)
+       SPLIT_THRESHOLD = cos(5*pi/180);
+    end
+    if ~exist('COOLRATE','var') || numel(COOLRATE) ~= 1 || COOLRATE(1) < 0  ...
+       || isempty(COOLRATE)
+       COOLRATE = 0.8;
+    end
+    
+    if ~exist('TMIN','var') || numel(TMIN) ~= 1 || TMIN(1) < 0  ...
+       || isempty(TMIN)
+       TMIN = 0.00025;
+    end
+    
+    if ~exist('TMAX','var') || numel(TMAX) ~= 1 || TMAX(1) < 0  ...
+       || isempty(TMAX)
+       TMAX = 0.02;
+    end
+    
+    
+    if ~exist('METHOD', 'var') || numel(DEBUG) ~= 1 || strcmp(METHOD,'KM')
+       METHOD = 'DA';
+    end
+    
+    if ~exist('DOWNSAMPLERATE', 'var') || numel(DOWNSAMPLERATE) ~= 1 || DOWNSAMPLERATE(1) < 0 ...
+       || isempty(DOWNSAMPLERATE)
+       if strcmp(METHOD,'DA')
+           DOWNSAMPLERATE = 1;
+       else
+           DOWNSAMPLERATE = 5;
+       end
+    end
+    
+    if ~exist('MAX_CLU_NUM','var') || numel(MAX_CLU_NUM) ~= 1 || MAX_CLU_NUM(1) < 0 ...
+       || isempty(MAX_CLU_NUM)
+%       if strcmp(METHOD,'DA')
+%            MAX_CLU_NUM = 20;
+%        else
+%            MAX_CLU_NUM = 50;
+%       end
+        MAX_CLU_NUM = min(2*bands, 50);
+    end
+    
+    if ~exist('DEBUG', 'var') || numel(DEBUG) ~= 1 || DEBUG(1) < 0
+       DEBUG = 1;
+    end
+    
+    if ~exist('S', 'var') 
+        fprintf('No input found. Please check function definition by `help recover_materials''\n');
+        return;
+    end
+    if strcmp(METHOD,'DA')
+        [MAT, MATIND, MATAB] = recover_materials_DA(S, DEBUG, DOWNSAMPLERATE, MAX_CLU_NUM, TMAX, TMIN, COOLRATE, SPLIT_THRESHOLD);
+    else
+        [MAT, MATIND, MATAB] = recover_materials_KM(S, MAX_CLU_NUM, DEBUG, DOWNSAMPLERATE);
+    end
+    %   Normalise the material matrix and finish off
+    norm = sqrt(sum(MAT .^2, 2));
+%     [~,bands] = size(MAT);
+    norm(find(norm==0))=1;
+    MAT = MAT./ norm(:, ones(bands, 1));
+end
+##### SOURCE END #####
+--></body></html>

@@ -1,0 +1,269 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Multiple-illuminant recovery routine</title><meta name="generator" content="MATLAB 7.12"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2014-04-16"><meta name="DC.source" content="recover_multi_illuminant.m"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>Multiple-illuminant recovery routine</h1><!--introduction--><!--/introduction-->
+  <h2>Contents</h2><div><ul><li><a href="#1">Syntax</a></li><li><a href="#2">Description</a></li><li><a href="#3">Inputs</a></li>
+  <li><a href="#4">Outputs</a></li><li><a href="#5">See also</a></li><li><a href="#6">Notes</a></li></ul></div>
+  
+  <h2>Syntax:<a name="1"></a></h2><pre>     [L, model] = recover_multi_illuminant(I);
+     [L, model] = recover_multi_illuminant(I, options);</pre><h2>Description:<a name="2"></a>
+	 </h2><pre>     Computes the power spectrum of multiple light sources in a scene.</pre>
+	 <h2>Inputs:<a name="3"></a></h2><pre>     I: 3D hyperspectral image data cube (height x width x bands).
+     options: Structure with the following fields
+          bitdepth: Data type for the spectral cube, i.e. number of bits per
+               spectral measurement. By fault this is 16.
+          use_gaussian: If this variable is set to unity, the illuminants are
+               recovered using a Gaussian prior. If this field is set to zero, a
+               kernel density estimator (KDE) is used instead. The default is
+               options.use_gaussian = 0.
+          ndims: Upper bound for the number of illuminants in the scene.
+               If ndims is not provided, it is automatically set to 3.
+          ngmm: Number of mixtures used for the initialisation. This is only
+              used if no initmodel is provided and, by default, is set to 3.
+          method: Selects the method used to compute each of the illuminants in the scene.
+               It can be any of the following strings:
+              'HRK': Employs the method of Huynh and Robles-Kelly (A Solution of the
+                  Dichromatic Model for Multispectral Photometric Invariance, International
+                  Journal of Computer Vision 2010).
+              'FS': Uses the method of Finlayson and Schaefer (Convex and Non-convex Illuminant
+                  Constraints for Dichromatic Colour Constancy, CVPR 2001).
+              'GW': Uses the Grey World method.
+              'SG': Uses the Shade of Grey method.
+              'WP': Uses the White Patch method.
+              '1stOGE': Uses the 1st order Grey Edge method.
+              '2ndOGE': Uses the 2nd order Grey Edge method.
+          drate: Image downsampling rate for the Grey World, Shade of Grey,
+                 White Patch and Grey Edge methods. The default is 1,
+                 i.e. no downsampling.
+          shadeOfGreyOrder: The order of the L^p mean used for the Shade of Grey method.
+                 The default is 1.
+          alpha: The value for the regularisation term used for the HRK
+               (Huynh and Robles-Kelly) method. The default is 50.
+          patches: Pre-selected patch geometry (can be left empty). This could be a set  
+              of geometry data for image patches whose format is 
+              [Top_left_y, top_left_x, height, width].
+          PSFFactor: The factor used for the PSF employed to 'soften' the distribution of
+              abundances for the illuminants. The default is 10.
+          DEBUG: Defines the level of debugging information shown at execusion time (0&lt;DEBUG&lt;6).
+             the default is 0.</pre>
+			 
+			 <h2>Outputs:<a name="4"></a></h2><pre>     L: illuminants recovered from the scene.
+     model: Structure containing the initial mixture model. This
+          contains the following fields
+          q: Number of components for the mixture.
+          T_idx: Cell array containing the indexes for the pixels classified based
+               upon the distance to the mixture means.
+          centres_w: Means for the mixture weights.
+          covars_w: Covariance matrices for the weighted mixtures.
+          centres: Means for the unweighted mixtures.
+          covars: Covariance matrices for the unweighted mixtures.
+          Uq: Principal components for the sampled pixels. This is computed using SVD.
+          EM_options: Set of options used for the em_gmm routine.
+          prioL: Prior for each of the components over the data (image pixels).
+          tip_record: Value of the pixel (instance) in the data which corresponds to the simplex
+               that is better aligned to the mixture.
+          pLx_map: Map of labels for the data accroding to the GMM and the
+               Markov random field used for the train_gmm_model.
+          pLx_prob: Map of probabilities for the data as delivered by the
+               Markov random field.</pre>
+			   
+			   <h2>See also:<a name="5"></a></h2><pre>     recover_global_illuminant, recover_dichromatic_parameters</pre>
+			   
+			   <h2>Notes:<a name="6"></a></h2><pre>     This routine requires the use of the randwalk function and, hence,
+     the SuiteSparse package, which can be downloaded from
+     <a href="http://www.cise.ufl.edu/research/sparse/SuiteSparse/">http://www.cise.ufl.edu/research/sparse/SuiteSparse</a>.</pre><p class="footer"><br>
+     Published with MATLAB&reg; 7.12<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Multiple-illuminant recovery routine
+%
+%% Syntax
+%   [L, model] = recover_multi_illuminant(I);
+%   [L, model] = recover_multi_illuminant(I, options);
+%
+%% Description:
+%   Computes the power spectrum of multiple light sources in a scene.
+%
+%% Inputs:
+%   I: 3D hyperspectral image data cube. It contains height X width X bands pixels.
+%   options: Structure with the following fields
+%           bitdepth: Is the data type for the spectral cube, i.e. number of bits per
+%               spectral measurement. By fault this is 16.
+%           use_gaussian: If this variable is set ot unity, the GMM model is
+%               recovered using a Gaussian prior. If this field is set to zero, a
+%               kernel density estimator (KDE) is used instead. The default is
+%               options.use_gaussian = 0.
+%           ndims: Number of dmensions in which the data is to be subspace-projected.
+%               If ndims is not provided, it is automatically set to 3.
+%           ngmm: Number of mixtures used for the initialisation. This is only
+%               used if no initmodel is provided and, by default, is set to 3;
+%           method: Selects between the following methods 
+%               'HRK': Employs the method of Huynh and Robles-Kelly (A Solution of the 
+%                   Dichromatic Model for Multispectral Photometric Invariance, International 
+%                   Journal of Computer Vision 2010).
+%               'FS': Uses the method of Finlayson and Schaefer (Convex and Non-convex Illuminant 
+%                   Constraints for Dichromatic Colour Constancy, CVPR 2001).
+%               'GW': Uses the Grey World method.
+%               'SG': Uses the Shade of Grey method.
+%               'WP': Uses the White Patch method.
+%               '1stOGE': Uses the 1st order Grey Edge method.
+%               '2ndOGE': Uses the 2nd order Grey Edge method.
+%           drate: Image downsampling rate for the Grey World, Shade of Grey,
+%                   White Patch and Grey Edge methods. The default is 1,
+%                   i.e. no downsampling.
+%           shadeOfGreyOrder: The order of the L^p mean used for the Shade of Grey method.
+%                   The default is 1.
+%           alpha:   The value for the regularisation term used for the HRK
+%               (Huynh and Robles-Kelly) method. The default for this is 50. 
+%           patches: Pre-selected patches. This could be a set of geometry data of patches
+%               with a format of (Top_left_y, top_left_x, height,
+%               width). This can be left empty.
+%           PSFFactor: The factor used for the PSF employed to 'soften' the distribution of abundances for
+%               the illuminants. The default is 10.
+%           DEBUG: Defines the level of debugging information shown at execusion time (DEBUG<6).
+%               the default is 0. 
+%
+%% Outputs:
+%   L: illuminants recovered from given arguments.
+%   model: Structure containing the initial general mixture model. This
+%   contains the following fields
+%         q: Number of components for the mixture
+%         T_idx: Cell array containing the indeces for the pixels classified based 
+%             upon the distance to the mixture means.
+%         centres_w: Means for the weighted mixture weights
+%         covars_w: Covariance matrices for the weighted mixtures.
+%         centres: Means for the unweighted mixture weights
+%         covars: Covariance matrices for the unweighted mixtures.
+%         Uq: Principal components for the sampled pixels. This is computed using SVD.
+%         EM_options: Set of options used for the em_gmm routine
+%         prioL: Prior for each of the components over the data (image pixels).
+%         tip_record: Value of the pixel (instance) in the data which corresponds to the simplex 
+%             that is better aligned to the mixture.
+%         pLx_map: Map of labels for the data accroding to the GMM and the
+%             Markov random field used for the train_gmm_model.
+%         pLx_prob: Map of probabilities for the data as delivered by the
+%             Markov random field.
+%
+%%   See also:
+%
+%       recover_global_illuminant, recover_dichromatic_parameters
+%
+%%   Notes:
+%
+%   This routine requires the use of the randwalk function and, hence, 
+%   the SuiteSparse package, which can be downloaded from 
+%   http://www.cise.ufl.edu/research/sparse/SuiteSparse/
+%
+%%
+
+
+function [ML, MODEL] = recover_multi_illuminant(I, options)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   
+% This computer code is subject to copyright: (c) National ICT Australia Limited (NICTA) 2013 All Rights Reserved.
+% Author: Ran Wei and Lin Gu
+% Version: 1.0.2
+% Last Update Date: 15 Jan 2014
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+   %Commence by checkin those variables applicable to both methods and 
+   %setting max image size
+   options.max_height = 176;
+   options.max_width = 208; 
+   [rows,cols,~]=size(I);
+   
+    if ~exist('options', 'var') || ~isfield(options,'method')
+        options.method = 'HRK';    
+    end
+    if ~isfield(options,'bitdepth') || (options.bitdepth~=8 && ...
+            options.bitdepth~=12) || numel(options.bitdepth) ~= 1
+        options.bitdepth = 16;    
+    end
+    if ~isfield(options,'patches') || isempty(options.patches) 
+            options.patches = 0;    
+    end
+    if ~isfield(options,'use_gaussian')
+            options.use_gaussian = 0;
+    end
+    if ~isfield(options,'ndims')
+        options.ndims = 6;
+    end
+    if ~isfield(options,'ngmm')
+        options.ngmm = 3;
+    end
+    if ~isfield(options,'PSFFactor')|| options.PSFFactor<=0 ...
+         || numel(options.PSFFactor) ~= 1
+         options.PSFFactor = min([10,rows,cols]);
+    end
+    if ~isfield(options,'Q_THRESHOLD')
+        options.Q_THRESHOLD = 15 * ones(1,options.ndims);
+    end
+    if ~isfield(options,'DEBUG') || isempty(options.DEBUG) || options.DEBUG > 5 || options.DEBUG < 0
+        options.DEBUG = 0;
+    end
+    if ~isfield(options,'alpha') || options.alpha<0 || numel(options.alpha) ~= 1
+                options.alpha = 50;
+    end
+    [ML, MODEL] = recover_multi_illuminant_(I, options);
+end
+##### SOURCE END #####
+--></body></html>

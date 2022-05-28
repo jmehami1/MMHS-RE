@@ -1,0 +1,191 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Combine end members so as to obtain mixed spectra.</title><meta name="generator" content="MATLAB 7.12"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2014-04-07"><meta name="DC.source" content="mix_spectra.m"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>Combine end-members so as to obtain mixed spectra.</h1><!--introduction--><!--/introduction-->
+  <h2>Contents</h2><div><ul><li><a href="#1">Syntax</a></li><li><a href="#2">Description</a></li><li><a href="#3">Inputs</a></li><li><a href="#4">Outputs</a></li><li><a href="#5">See also</a></li></ul></div><h2>Syntax<a name="1"></a></h2><pre>    Q = mix_spectra(Abundances, Indexes, Endmembers);
+    Q = mix_spectra(Abundances, Indexes, Endmembers, numMaterials);
+    Q = mix_spectra(Abundances, Indexes, Endmembers, numMaterials, normalise);</pre><h2>Description:<a name="2"></a></h2><pre>    Mix the spectra given a set of abundances, indexes and endmembers. This is, effectively, 
+    the inverse operation to unmixing.</pre><h2>Inputs:<a name="3"></a></h2><pre>    Abundances: Matrix containign the abundance coefficients per endmember. This is a
+        cols x rows x endmembers matrix, where the output matrix Q is cols x rows x bands.
+    Indexes: Matrix containing the indexes for the endmembers.
+    Endmembers: Matrix whose rows are indexed to the end members and columns to the
+        wavelength, i.e. Endmember(i,:) contains the ith end member spectrum.
+    numMaterials: Number of materials used for the recovery of the spectra. If
+        this is not provided, the size of 3rd dimension of the abundance matrix is used.
+    normalise: If normalise is unity, the output spectra is normalised accordingly,
+                  i.e. norm(Q(i,i),3) is equivalent to 1. The default is 1.</pre>
+				  
+				  <h2>Outputs:<a name="4"></a></h2><pre>    Q: Matrix of mixed spectra.</pre><h2>See also:<a name="5"></a></h2><pre>    L2_unmixing</pre><p class="footer"><br>
+      Published with MATLAB&reg; 7.12<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Mix end-members so as to obtain mixed spectra.
+%
+%% Syntax
+%     Q = mix_spectra(Abundances, Indexes, Endmembers)
+%     Q = mix_spectra(Abundances, Indexes, Endmembers, numMaterials)
+%     Q = mix_spectra(Abundances, Indexes, Endmembers, numMaterials, normalise)
+% 
+%% Description
+%
+% Mix the spectra given a set of abundances, indexes and endmembers. 
+% This is, effectively, the inverse operation to unmixing.
+%
+%% Inputs:
+%
+%     Abundances:   Matrix containign the abundance coefficients per endmember. This is a 
+%                   cols x rows x endmembers matrix, where the output matrix Q is cols x rows x bands.
+%     Indexes:      Matrix containing the indexes for the endmembers.
+%     Endmembers:   Matrix whose rows are indexed to the endmembers and columns to the 
+%                   wavelength, i.e. Endmember(i,:) contains the ith endmember spectrum
+%     numMaterials:    Number of materials used for the recovery of the spectra. If 
+%                   this is not provided, the size of 3rd dimension of the abundance matrix is used.
+%     normalise:    If normalise is unity, the output spectra is normalised accordingly, 
+%                    i.e. norm(Q(i,i),3) is equivalent to 1. The default is 1.
+% 
+%% Outputs:
+%    Q: Matrix of mixed spectra
+% 
+%% See also
+%   L2_unmixing
+%%
+
+function Q = mix_spectra(Abundances, Indexes, Endmembers, numMaterials, normalise)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% This computer code is subject to copyright: (c) National ICT Australia Limited (NICTA) 2013 All Rights Reserved.
+% Author: Ran Wei and Antonio Robles-Kelly.
+% Version: 1.0.5
+% Last Update Date: 29 Oct 2013
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Setup the parameters before starting
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+[num,bands]=size(Endmembers);
+if (ndims(Abundances)<3)
+    [rows,weights]=size(Abundances);
+    Q=zeros(rows,bands);
+else
+    [rows,cols,weights]=size(Abundances);
+    Q=zeros(rows,cols,bands);
+end
+  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Set the default to a band-normalised spectra matrix
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if ~exist('numMaterials', 'var')
+    numMaterials=weights;
+else
+    numMaterials=min(weights,numMaterials);
+end
+if ~exist('normalise', 'var') || normalise ~= 0
+    normalise = 1;
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Do the mixing
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if ndims(Abundances)<3
+    for r=1:rows
+        for w=1:numMaterials
+            if numMaterials>1
+                Q(r,:)=Q(r,:)+reshape(Abundances(r,w)*Endmembers(Indexes(r,w),:),1,bands);
+            else
+                Q(r,:)=Q(r,:)+reshape(Abundances(r)*Endmembers(Indexes(r),:),1,bands);
+            end
+        end
+    end
+else
+    for r=1:rows
+        for c=1:cols
+            for w=1:numMaterials
+                if numMaterials>1
+                    Q(r,c,:)=Q(r,c,:)+reshape(Abundances(r,c,w)*Endmembers(Indexes(r,c,w),:),1,1,bands);
+                else
+                    Q(r,c,:)=Q(r,c,:)+reshape(Abundances(r,c)*Endmembers(Indexes(r,c),:),1,1,bands);
+                end
+            end
+        end
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Normalise the matrix
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if normalise == 1
+    if ndims(Abundances)<3
+        Norm = sqrt(sum(Q .^2, 2));
+        Norm(find(Norm==0))=1;
+        Q = Q ./ Norm(:, ones(bands, 1));
+    else
+        Norm = sqrt(sum(Q .^2, 3));
+        Norm(find(Norm==0))=1;
+        Q = Q ./ Norm(:, :, ones(bands, 1));
+    end
+end
+
+
+
+##### SOURCE END #####
+--></body></html>
