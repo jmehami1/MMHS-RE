@@ -1,6 +1,6 @@
 ## Supplementary materials for "Multi-modal Non-Isotropic Light Source Modelling for Reflectance Estimation in Hyperspectral Imaging "
 
-This page contains dataset and supplementary materials for the paper. We will release the implementation after the publication of our paper
+This page contains dataset and supplementary materials for the paper.
 
 ![example](/MMHS-RE/docs/images/illustration.png)
 
