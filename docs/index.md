@@ -2,7 +2,7 @@
 
 This page contains dataset and supplementary materials for the paper.
 
-![example](/MMHS-RE/docs/images/illustration.png)
+![example](images/illustration.png)
 
 ### Implementation of the light source estimation
 
