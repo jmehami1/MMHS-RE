@@ -2,6 +2,10 @@
 
 This page contains dataset and supplementary materials for the paper. We will release the implementation after the publication of our paper
 
+### Implementation of the light source estimation
+
+The github repository providing the implementation of the light source estimation is available [here](https://github.com/jmehami1/MMHS-RE).
+
 ### Mitsuba config file and dataset
 
 We forked the first version of Mitsuba and added the hyperspectral image generation (see [here](https://github.com/jmehami1/mitsuba)). The config file for the mitsuba simulator can be downloaded [here]() and the produced images are available [here]().
