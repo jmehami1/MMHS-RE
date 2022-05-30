@@ -10,7 +10,7 @@ The github repository providing the implementation of the light source estimatio
 
 ### Mitsuba config file and dataset
 
-We forked the first version of Mitsuba and added the hyperspectral image generation (see [here](https://github.com/jmehami1/mitsuba)). The config file for the mitsuba simulator can be downloaded [here]() and the produced images are available [here]().
+We forked the first version of Mitsuba and added the hyperspectral image generation (see [here](https://github.com/jmehami1/mitsuba)). The config file for the Mitsuba scenes can be found [here](https://drive.google.com/drive/folders/1SIUlGbyHUFoWXUvZ2eydZz-lOyQSqijd?usp=sharing) .
 
 ### Supplementary material for the paper
 
