@@ -1,6 +1,6 @@
 ## Supplementary materials for "Multi-modal Non-Isotropic Light Source Modelling for Reflectance Estimation in Hyperspectral Imaging "
 
-This page contains dataset and supplementary materials for the paper.
+This page contains datasets and supplementary materials for the paper.
 
 ![example](images/illustration.png)
 
@@ -17,9 +17,11 @@ There are two different branches which need to **cloned**, **compiled** and **bu
 - [Mitsuba RGB simulator](https://github.com/jmehami1/mitsuba/tree/master)
 - [Mitsuba Spectral simulator](https://github.com/jmehami1/mitsuba/tree/spectral) 
 
-These should be in separate directories. The spectral version renders hypercubes of 100 channels.
+These repositories should be in separate directories. The spectral version renders hypercubes of 100 channels.
 
-added the hyperspectral image generation (see [here](https://github.com/jmehami1/mitsuba)). The config file for the Mitsuba scenes can be found [here](https://drive.google.com/drive/folders/1SIUlGbyHUFoWXUvZ2eydZz-lOyQSqijd?usp=sharing) .
+The scene files to render examples from the paper are found in [here](https://drive.google.com/file/d/15_dZxSGzgQUROp-pKEY7Gn8SvvX6r1b1/view?usp=sharing). The README will describe the process to generate datasets.
+
+
 
 ### Supplementary material for the paper
 
