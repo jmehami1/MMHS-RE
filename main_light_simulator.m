@@ -1,4 +1,20 @@
-%Initial script for simulating a non-isotropic point light source.
+% This script simulates a non-isotropic disk light source using a real RID
+% profile. This script highlights the GP light-src-mean function
+% capabilities.
+% You can play with the light simulator and change its parameters to get a
+% live preview of the irradiance.
+% Outputs will be exported to a new directory called "light_sim_results"
+% Discrete spatial measurements of a known Lambertian target are acquired
+% which are then used to fit light source models with a least-square fit,
+% and various GP models.
+% Further details regarding my work can be found in my paper:
+%
+% Mehami, J., Falque, R., Vidal-Calleja, T., & Alempijevic, A. (2022).
+% Multi-Modal Non-Isotropic Light Source Modelling for Reflectance
+% Estimation in Hyperspectral Imaging. IEEE Robotics and Automation
+% Letters, 7(4), 10336-10343.
+%
+% Author: Jasprabhjit Mehami
 
 clc;
 close all;
@@ -9,9 +25,6 @@ addpath('ext_lib');
 
 %robotics toolbox
 run(fullfile('ext_lib', 'rvctools', 'startup_rvc.m'));
-
-%yaml reader package
-% addpath(genpath(fullfile('ext_lib', 'yamlmatlab-master')));
 
 %GPML toolbox
 run(fullfile('ext_lib', 'gpml-matlab-master', 'startup.m'));
@@ -163,7 +176,6 @@ y = xyzTrans(2,:);
 z = xyzTrans(3,:);
 
 vpPatch = patch(x,y,z, [0,0,1], 'FaceAlpha', 0.3);
-
 vpDispCheck = uicontrol('Parent',figSim,'Style','checkbox', 'String', 'Display View-plane', 'Position', [20,25,200,20] , 'Value', true);
 vpDispCheck.Callback = @(src, eventData) vp_callback(src, eventData, vpPatch);
 
@@ -278,7 +290,7 @@ for sampleLoop = 1:noSamples
     %                 a = deg2rad(100);
     %                 b = deg2rad(260);
     %                 xAngle = (b-a)*rand()+(a);
-    %     %initially assume a constant normal angle
+    %%initially assume a constant normal angle
     xAngle = pi;
     rotTargetLS = eul2rotm([0, 0, xAngle], 'ZYX');
     
@@ -360,12 +372,12 @@ for sampleLoop = 1:noSamples
     
     %plot line and axes of target in the simulator figure
     figure(figSim);
-    line(targetPtsFrame(1,:), targetPtsFrame(2,:), targetPtsFrame(3,:), 'Color', [0,0,0], 'LineWidth', 2); hold on;
+    line(targetPtsFrame(1,:), targetPtsFrame(2,:), targetPtsFrame(3,:), 'Color', [1,0,1], 'LineWidth', 1.5); hold on;
     trplot(T_target_2_F, 'rviz', 'length', (maxRange - minRange)*0.05);
     
     %plot line in the view-plane intensity plot
     figure(figViewPlane);
-    line(targetPtsLS(2,:), targetPtsLS(3,:), maxRadiInt.*ones(size(targetPtsLS(2,:))), 'Color', [0,0,0], 'LineWidth', 2);    
+    line(targetPtsLS(2,:), targetPtsLS(3,:), maxRadiInt.*ones(size(targetPtsLS(2,:))), 'Color', [1,0,1], 'LineWidth', 2);    
 end
 
 drawnow();
@@ -616,7 +628,7 @@ plotlinescanviewplane(Y, Z, diffRad, maxRadiInt, T_S_2_LS, T_F_2_LS, [yPoly;zPol
 imgName = fullfile(resultsDir, 'sim_gp_lightsrc_c.png');
 exportpropergraphic(hfig, imgName,  hwRatioDefault);
 
-%% 
+%% Violin Plot
 
 %calculate absolute differences w.r.t to ground-truth
 diffRadLS = abs(radIntMagGroundtruth - radIntMagLeastSqr);
