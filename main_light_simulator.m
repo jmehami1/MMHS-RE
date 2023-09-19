@@ -16,9 +16,9 @@
 %
 % Author: Jasprabhjit Mehami
 
-clc;
-close all;
-clear;
+% clc;
+% close all;
+% clear;
 
 %external library directory
 addpath('ext_lib');
@@ -252,165 +252,27 @@ target.RightEdge = [0; target.Width/2; 0];
 %different random locations of the target in the view-plane of the
 %line-scan camera
 noSamples = 50;
+noExperiments = 50;
 
 KMat = lsIntrinsic.IntrinsicMatrix';
 KMat(1,3) = 0;
 
-%store the points in the frame camera c.f and the normal for each sample
-targetSamplePtsFrame = cell(1,noSamples);
-targetSampleSurfNorm = zeros(3, noSamples);
 
 
-minTheta = deg2rad(-10);
-maxTheta = deg2rad(60);
+% minTheta = deg2rad(-10);
+% maxTheta = deg2rad(60);
+% yaw angle variation of target
+targetYawVariation = 5;
 
-for sampleLoop = 1:noSamples
-    %get random distance between line-scan and target in metres
-    distLS2Target = (maxRange - minRange)*rand() + minRange;
-    %plot the light intensity produced by the light source on the line-scan
-    
-    %pixel location of the centre of target in line-scan image
-    pixTargetCent = randi([0,yPix]);
-    
-    %normalise centre pixel location
-    pixTargetCentHom = [0 ; pixTargetCent; 1];
-    normTargetCent = KMat\pixTargetCentHom;
-    normTargetCent = normTargetCent./normTargetCent(3);
-    
-    %Use the normalised coordinate to determine the direction of the pixel
-    %ray. The translation of the target coordinate frame is found by
-    %multiplying the distance from the line-scan camera with the direction
-    %of the ray
-    dirNormTargetCent = normTargetCent./norm(normTargetCent);
-    targetCentPos =  distLS2Target.*dirNormTargetCent;
+targetTrialsCell = cell(1,noExperiments);
 
-    
-    %pick angle about x-axis between 90deg and 270 deg to get the pose of
-    %the target. Only assume rotation about x-axis (yaw only)
-    %                 a = deg2rad(100);
-    %                 b = deg2rad(260);
-    %                 xAngle = (b-a)*rand()+(a);
-    %%initially assume a constant normal angle
-    xAngle = pi;
-    rotTargetLS = eul2rotm([0, 0, xAngle], 'ZYX');
-    
-    %pose of target w.r.t to line-scan camera c.f
-    T_target_2_LS = [rotTargetLS, targetCentPos; 0, 0, 0, 1];
+for expLoop = 1:noExperiments
 
-    %normal vector of the target surface (z-axis) w.r.t to LS
-    normTargetLS = T_target_2_LS(1:3,3);
-    
-    %left and right edge of the target in its coordinate frame
-    targetEdgesPtsHom = [[target.LeftEdge; 1], [target.RightEdge; 1]];
-    
-    %project target edges to line-scan image
-    imgTargetEdges = projectpoints(targetEdgesPtsHom', KMat, T_target_2_LS, [], lsIntrinsic.ImageSize);
-    
-    %extract v coordinate of pixels
-    vImgTargetEdges = imgTargetEdges(:,2);
-    
-    %Check if the edge pixels are within the size of the line-scan image, else
-    %set the edge pixels to be the limits of the line-scan image
-    for j = 1:2
-        vImgTargetEdges(j) = round(vImgTargetEdges(j));
-        
-        %outside on the left of the image line
-        if vImgTargetEdges(j) < 1
-            vImgTargetEdges(j) = 1;
-            %outside on the right of the image line
-        elseif vImgTargetEdges(j) > yPix
-            vImgTargetEdges(j) = yPix;
-        end
-    end
-    
-    
-    %vector of all pixels that see the target
-    if vImgTargetEdges(1) > vImgTargetEdges(2)
-        vtargetPix = vImgTargetEdges(2):vImgTargetEdges(1);
-    else
-        vtargetPix = vImgTargetEdges(1):vImgTargetEdges(2);
-    end
-    
-    %transform to normalized coordinates
-    targetPixHom  = [zeros(size(vtargetPix)); vtargetPix; ones(size(vtargetPix))];
-    normTargetPixHom = KMat\targetPixHom;
-    
-    %3D points on target plane
-    targetPtsLS = zeros(3, length(vtargetPix));
-    ptCount = 0;
-    
-    %trace pixel ray from the line-scan camera to the target frame to
-    %determine its 3D location w.r.t LS
-    for pixelLoop = 1:length(vtargetPix)
-        pnt = normTargetPixHom(:,pixelLoop);
-                
-        [pntOnTarget, valid] = camerapixelrayintersectplane(pnt', normTargetLS', targetCentPos');
-        
-        %ray intersection was not valid
-        if ~valid
-           continue; 
-        end
-        
-        ptCount = ptCount + 1;
-        targetPtsLS(:, ptCount) = pntOnTarget;
-    end
-    
-    targetPtsLS = targetPtsLS(:,1:ptCount);
-    
-    %transform points from line-scan to frame camera
-    targetPtsFrame = T_LS_2_F*[targetPtsLS; ones(1,length(targetPtsLS(1,:)))];
-    targetPtsFrame = targetPtsFrame(1:3,:);
-    
-    %save the target pts in the c.f of the frame camera
-    targetSamplePtsFrame(sampleLoop) = {targetPtsFrame};
-    
-    %pose of target w.r.t frame camera c.f
-    T_target_2_F = T_LS_2_F*T_target_2_LS;
-    %surface normal of target w.r.t to F
-    targetSampleSurfNorm(:,sampleLoop) = T_target_2_F(1:3,3);
-    
-    
-    %plot line and axes of target in the simulator figure
-    figure(figSim);
-    line(targetPtsFrame(1,:), targetPtsFrame(2,:), targetPtsFrame(3,:), 'Color', [1,0,1], 'LineWidth', 1.5); hold on;
-    trplot(T_target_2_F, 'rviz', 'length', (maxRange - minRange)*0.05);
-    
-    %plot line in the view-plane intensity plot
-    figure(figViewPlane);
-    line(targetPtsLS(2,:), targetPtsLS(3,:), maxRadiInt.*ones(size(targetPtsLS(2,:))), 'Color', [1,0,1], 'LineWidth', 2);    
-end
-
-drawnow();
+[targetSamplePtsFrame, targetSampleSurfNorm] = sampletarget(noSamples, maxRange, minRange, yPix, KMat, target, lsIntrinsic, T_LS_2_F, figSim, figViewPlane, maxRadiInt, targetYawVariation);
 
 %% Measure pixel intensity at the 3D location on the target which is relative to the frame camera
 
-%stores the intensity measured at a specific 3D location. The measured
-%intensity at the symmetric target would be the exact same
-targetSampleNormRadiance = cell(1, noSamples);
-
-for sampleLoop = 1:noSamples
-    targetPtsFrame = targetSamplePtsFrame{sampleLoop};
-    targetNormal = targetSampleSurfNorm(:, sampleLoop);
-    
-    %intensity measured at the 3D location by the line-scan camera in the
-    %coordinate frame of the frame camera.
-    %***** NOTE: Darkening effects, vignetting, sensor irregularties have
-    %not been considered yet
-    
-    numPts = size(targetPtsFrame, 2);
-    
-    targetInten = zeros(1,numPts);
-    
-    for pt = 1:numPts
-        targetInten(pt) = lightSrc.RadianceOutMaterialPoint(targetPtsFrame(:,pt), targetNormal, target.Reflectance);
-    end
-    
-
-    %add gaussian white noise to target pixel measurements
-    targetIntenNoise = targetInten + normrnd(0, intNoiseSigma, size(targetInten));
-        
-    targetSampleNormRadiance(sampleLoop) = {targetIntenNoise};
-end
+targetSampleNormRadiance = measurecameraintensityontarget(noSamples, targetSamplePtsFrame, targetSampleSurfNorm, lightSrc, target, intNoiseSigma);
 
 %% Combine the samples such that they can be analysed by regressional approaches
 
@@ -418,63 +280,24 @@ end
 %will add an extra sample
 
 % {noSamples} x {targetL, targetPntNormals, targetPntFrame, targetPntNormalsSymm, targetPntFrameSymm}
-targetTrials = cell(noSamples, 3);
-
-for trials = 1:noSamples
-    targetL = zeros(1,2*trials*yPix);
-    targetPntNormals = zeros(3,2*trials*yPix);
-    targetPntFrame = zeros(3, 2*trials*yPix);
-    
-    noPts = 0;
-    
-    %combines all samples into a single array for the current trials
-    for sampleLoop = 1:trials
-        noCurPts = length(targetSampleNormRadiance{sampleLoop});
-        
-        targetL(noPts+1:noPts+noCurPts) = targetSampleNormRadiance{sampleLoop};
-        targetPntNormals(:, noPts+1:noPts+noCurPts) = repmat(targetSampleSurfNorm(:, sampleLoop), [1, noCurPts]);
-        targetPntFrame(:, noPts+1:noPts+noCurPts) = targetSamplePtsFrame{sampleLoop};
-
-        noPts = noPts + noCurPts;
-    end
-    
-    %clip the arrays to correct size
-    targetL = targetL(1:noPts);
-    targetPntNormals = targetPntNormals(:, 1:noPts);
-    targetPntFrame = targetPntFrame(:, 1:noPts);
-    
-    targetTrials(trials,:) = {targetL, targetPntNormals, targetPntFrame};    
+targetTrials = combinesamplesforregression(noSamples, yPix, targetSampleNormRadiance, targetSampleSurfNorm, targetSamplePtsFrame);
+targetTrialsCell(expLoop) = {targetTrials};
 end
 
 %% Estimate parameters through least squares
 
-optOptions = optimoptions('lsqnonlin', 'Algorithm', 'levenberg-marquardt', 'SpecifyObjectiveGradient',true, 'CheckGradients', false, ...
-    'MaxIterations', 1000000000, 'FunctionTolerance',1e-6, 'MaxFunctionEvaluations',1000000000, 'StepTolerance',1e-6, ...
-    'FiniteDifferenceType', 'central', 'ScaleProblem','none');
-optOptions.Display = 'none';
+targetTrials = targetTrialsCell{1};
+[resNormTrialsMC, eigFIMMC, radIntMagGroundtruthMC, radIntMagLeastSqrMC, diffRadMC] = solve_leastsquares(noSamples, targetTrials, lightSrc, target, intNoiseSigma, locLightSrc, rotLightSrc, XFrame, YFrame, ZFrame);
 
-optPhiTrials = zeros(noSamples, 3);
-resNormTrials = zeros(noSamples, 1);
+for expLoop = 2:noExperiments
+    targetTrials = targetTrialsCell{expLoop};
+    [resNormTrials, eigFIM, radIntMagGroundtruth, radIntMagLeastSqr, diffRad] = solve_leastsquares(noSamples, targetTrials, lightSrc, target, intNoiseSigma, locLightSrc, rotLightSrc, XFrame, YFrame, ZFrame);
 
-eigFIM = zeros(noSamples, 3);
-rankFIM = zeros(noSamples, 1);
-
-Phi0 = [1, 1, 1];
-
-for trials = 1:noSamples
-    
-    targetL = targetTrials{trials,1};
-    targetPntFrame = targetTrials{trials,3};
-    targetPntNormals = targetTrials{trials,2};
-    
-    [optPhi,resNorm, curRankFIM, curEigFIM] = LightSrcOptmLS(lightSrc, Phi0, targetL, targetPntFrame, targetPntNormals, target.Reflectance, optOptions, intNoiseSigma);
-    
-    %store optimised parameters and residual
-    optPhiTrials(trials, :) = optPhi;
-    resNormTrials(trials) = resNorm;
-    
-    rankFIM(trials) = curRankFIM;
-    eigFIM(trials,:) = curEigFIM;
+    resNormTrialsMC = resNormTrialsMC + resNormTrials;
+    eigFIMMC = eigFIMMC + eigFIM;
+    radIntMagGroundtruthMC = radIntMagGroundtruthMC + radIntMagGroundtruth;
+    radIntMagLeastSqrMC = radIntMagLeastSqrMC + radIntMagLeastSqr;
+    diffRadMC = diffRadMC + diffRad;
 end
 
 %% Results of least squares
@@ -504,14 +327,6 @@ grid on;
 %Compare Radiant intensity view-plane image of ground-truth parameters and
 %estimated parameters
 
-lightSrcLeastSqrs = LightSimulator(locLightSrc, rotLightSrc, optPhiTrials(end, 1), optPhiTrials(end, 2), optPhiTrials(end, 3));
-
-%plot the light intensity produced by the light source on the line-scan
-%camera's view-plane
-radIntMagGroundtruth = lightSrc.RadiantIntensityMesh(XFrame, YFrame, ZFrame);
-radIntMagLeastSqr = lightSrcLeastSqrs.RadiantIntensityMesh(XFrame, YFrame, ZFrame);
-diffRad = abs(radIntMagGroundtruth - radIntMagLeastSqr);
-
 hfig = figure();
 plotlinescanviewplane(Y, Z, radIntMagLeastSqr, maxRadiInt, T_S_2_LS, T_F_2_LS, [yPoly;zPoly], lsFigYlims, lsFigZlims);
 imgName = fullfile(resultsDir, 'sim_ls_a.png');
@@ -533,36 +348,22 @@ ptsLightSrc = ptsHomLightSrc(1:3, :);
 testingX = [ptsRadius', ptsTheta'];
 
 %% GP Training Points
-    
-targetL = targetTrials{end,1};
-targetPntFrame = targetTrials{end,3};
-targetPntNormals = targetTrials{end,2};
 
-%calculate the direction light vector (point to light source)
-pntLightVec = locLightSrc - targetPntFrame;
-dirPntLightVec = pntLightVec./vecnorm(pntLightVec);
+gp_model_type = 0;
 
-%Calculate radiant intensity magnitude used for building model
-radIntMagPnt = (targetL.*pi)./(target.Reflectance.*dot(targetPntNormals, dirPntLightVec,1));
+targetTrials = targetTrialsCell{1};    
+[~, downSamplingGPMC, radIntGPMC, radIntGPZeroMC, radVarMC, diffRadMC] = solve_gp(targetTrials, locLightSrc, target, T_S_2_F, testingX, gp_model_type, intNoiseSigma, rows, radIntMagGroundtruth);
 
-%find the point w.r.t to light source c.f
-targetPntFrameHom = [targetPntFrame; ones(1, length(targetPntFrame(1,:)))];
-targetPntLightSrcHom = T_S_2_F\targetPntFrameHom;
-targetPntLightSrc = targetPntLightSrcHom(1:3, :);
+for expLoop = 2:noExperiments
+    targetTrials = targetTrialsCell{expLoop};
+    [~, downSamplingGP, radIntGP, radIntGPZero, radVar, diffRad] = solve_gp(targetTrials, locLightSrc, target, T_S_2_F, testingX, gp_model_type, intNoiseSigma, rows, radIntMagGroundtruth);
 
-[ptsRadius,ptsTheta] = cart2sphZ(targetPntLightSrc(1,:), targetPntLightSrc(2,:), targetPntLightSrc(3,:));
-gpTrainingdata = [ptsRadius', ptsTheta', radIntMagPnt'];
-downSamplingGP = 30;
-
-%% Building model with GP Zero-mean non-symmetric
-
-%Build zero-mean GP model
-[mu, varMu] = LightSrcOptmGP(testingX, gpTrainingdata, 0, intNoiseSigma, downSamplingGP, 10000, false);
-
-radIntGP = reshape(mu,rows);
-radIntGPZero = radIntGP;
-radVar = reshape(varMu,rows);
-diffRad = abs(radIntGP - radIntMagGroundtruth);
+    downSamplingGPMC = downSamplingGPMC + downSamplingGP;
+    radIntGPMC = radIntGPMC + radIntGP;
+    radIntGPZeroMC = radIntGPZeroMC + radIntGPZero;
+    radVarMC = radVarMC + radVar;
+    diffRadMC = diffRadMC + diffRad;
+end
 
 hfig = figure();
 plotlinescanviewplane(Y, Z, radIntGP, maxRadiInt, T_S_2_LS, T_F_2_LS, [yPoly;zPoly], lsFigYlims, lsFigZlims);
@@ -581,12 +382,21 @@ exportpropergraphic(hfig, imgName,  hwRatioDefault);
 
 %% Building model with GP non-Symmetric Constant Mean
 
-%Build zero-mean GP model
-[mu, varMu] = LightSrcOptmGP(testingX, gpTrainingdata, 1, intNoiseSigma, downSamplingGP, 10000, false);
+gp_model_type = 1;
 
-radIntGP = reshape(mu,rows);
-radVar = reshape(varMu,rows);
-diffRad = abs(radIntGP - radIntMagGroundtruth);
+targetTrials = targetTrialsCell{1};    
+[~, downSamplingGPMC, radIntGPMC, radIntGPMeanMC, radVarMC, diffRadMC] = solve_gp(targetTrials, locLightSrc, target, T_S_2_F, testingX, gp_model_type, intNoiseSigma, rows, radIntMagGroundtruth);
+
+for expLoop = 2:noExperiments
+    targetTrials = targetTrialsCell{expLoop};
+    [~, downSamplingGP, radIntGP, radIntGPMean, radVar, diffRad] = solve_gp(targetTrials, locLightSrc, target, T_S_2_F, testingX, gp_model_type, intNoiseSigma, rows, radIntMagGroundtruth);
+
+    downSamplingGPMC = downSamplingGPMC + downSamplingGP;
+    radIntGPMC = radIntGPMC + radIntGP;
+    radIntGPMeanMC = radIntGPMeanMC + radIntGPMean;
+    radVarMC = radVarMC + radVar;
+    diffRadMC = diffRadMC + diffRad;
+end
 
 hfig = figure();
 plotlinescanviewplane(Y, Z, radIntGP, maxRadiInt, T_S_2_LS, T_F_2_LS, [yPoly;zPoly], lsFigYlims, lsFigZlims);
@@ -606,12 +416,21 @@ exportpropergraphic(hfig, imgName,  hwRatioDefault);
 
 %% Building model with GP Non-Symmetric light source mean function
 
-%Build zero-mean GP model
-[mu, varMu] = LightSrcOptmGP(testingX, gpTrainingdata, 3, intNoiseSigma, downSamplingGP, 10000, false);
+gp_model_type = 3;
 
-radIntGP = reshape(mu,rows);
-radVar = reshape(varMu,rows);
-diffRad = abs(radIntGP - radIntMagGroundtruth);
+targetTrials = targetTrialsCell{1};    
+[~, downSamplingGPMC, radIntGPMC, radIntGPlightsrcMC, radVarMC, diffRadMC] = solve_gp(targetTrials, locLightSrc, target, T_S_2_F, testingX, gp_model_type, intNoiseSigma, rows, radIntMagGroundtruth);
+
+for expLoop = 2:noExperiments
+    targetTrials = targetTrialsCell{expLoop};
+    [~, downSamplingGP, radIntGP, radIntGPlightsrc, radVar, diffRad] = solve_gp(targetTrials, locLightSrc, target, T_S_2_F, testingX, gp_model_type, intNoiseSigma, rows, radIntMagGroundtruth);
+
+    downSamplingGPMC = downSamplingGPMC + downSamplingGP;
+    radIntGPMC = radIntGPMC + radIntGP;
+    radIntGPlightsrcMC = radIntGPlightsrcMC + radIntGPlightsrc;
+    radVarMC = radVarMC + radVar;
+    diffRadMC = diffRadMC + diffRad;
+end
 
 hfig = figure();
 plotlinescanviewplane(Y, Z, radIntGP, maxRadiInt, T_S_2_LS, T_F_2_LS, [yPoly;zPoly], lsFigYlims, lsFigZlims);
@@ -632,7 +451,7 @@ exportpropergraphic(hfig, imgName,  hwRatioDefault);
 
 %calculate absolute differences w.r.t to ground-truth
 diffRadLS = abs(radIntMagGroundtruth - radIntMagLeastSqr);
-diffRadGP = abs(radIntMagGroundtruth - radIntGP);
+diffRadGP = abs(radIntMagGroundtruth - radIntGPlightsrc);
 diffRadZero = abs(radIntMagGroundtruth - radIntGPZero);
 
 %vectorise 2d matrices
